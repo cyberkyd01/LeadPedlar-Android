@@ -1,151 +1,252 @@
 package com.example.leadpedlar.ui.main
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AdminPanelSettings
-import androidx.compose.material.icons.filled.ListAlt
-import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.leadpedlar.LeadPedlarApp
-import com.example.leadpedlar.data.model.User
+import com.example.leadpedlar.calling.CallManager
+import com.example.leadpedlar.data.model.CallAppType
+import com.example.leadpedlar.data.model.LeadItem
 import com.example.leadpedlar.theme.BgDark
+import com.example.leadpedlar.theme.Cyan400
+import com.example.leadpedlar.theme.Cyan500
 import com.example.leadpedlar.theme.Emerald500
 import com.example.leadpedlar.theme.SurfaceBorder
 import com.example.leadpedlar.theme.SurfaceDark
-import com.example.leadpedlar.theme.TextMuted
 import com.example.leadpedlar.theme.TextPrimary
-import com.example.leadpedlar.ui.screens.admin.AdminOverviewScreen
-import com.example.leadpedlar.ui.screens.auth.LoginScreen
-import com.example.leadpedlar.ui.screens.leads.LeadsScreen
-import com.example.leadpedlar.ui.screens.marketplace.MarketplaceScreen
+import com.example.leadpedlar.theme.TextSecondary
+import com.example.leadpedlar.ui.components.CallAppSelectorBottomSheet
+import com.example.leadpedlar.ui.components.LeadPedlarWebView
 import com.example.leadpedlar.ui.screens.settings.SettingsScreen
+import kotlinx.coroutines.launch
 
-enum class AppTab(val title: String, val icon: @Composable () -> Unit, val adminOnly: Boolean = false) {
-    ADMIN(
-        title = "Admin",
-        icon = { Icon(Icons.Default.AdminPanelSettings, contentDescription = "Admin", modifier = Modifier.size(22.dp)) },
-        adminOnly = true
-    ),
-    LEADS(
-        title = "Leads",
-        icon = { Icon(Icons.Default.Phone, contentDescription = "Leads", modifier = Modifier.size(22.dp)) }
-    ),
-    MARKETPLACE(
-        title = "Marketplace",
-        icon = { Icon(Icons.Default.ShoppingCart, contentDescription = "Marketplace", modifier = Modifier.size(22.dp)) }
-    ),
-    SETTINGS(
-        title = "Settings",
-        icon = { Icon(Icons.Default.Settings, contentDescription = "Settings", modifier = Modifier.size(22.dp)) }
-    )
-}
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val appPrefs = LeadPedlarApp.instance.appPreferences
-    val isLoggedIn by appPrefs.isLoggedInFlow.collectAsState(initial = false)
-    val user by appPrefs.userFlow.collectAsState(initial = User())
+    val dialerPrefs = LeadPedlarApp.instance.dialerPreferences
 
-    val isAdmin = (user.role == "SUPER_ADMIN" || user.role == "ADMIN")
-    val availableTabs = remember(isAdmin) {
-        AppTab.entries.filter { !it.adminOnly || isAdmin }
-    }
+    val serverUrl by appPrefs.serverUrlFlow.collectAsState(initial = "http://10.0.2.2:3000")
+    val preferredApp by dialerPrefs.preferredAppFlow.collectAsState(initial = CallAppType.SYSTEM_CHOOSER)
+    val alwaysAsk by dialerPrefs.alwaysAskFlow.collectAsState(initial = true)
 
-    var currentTab by remember(isAdmin) {
-        mutableStateOf(if (isAdmin) AppTab.ADMIN else AppTab.LEADS)
-    }
+    var currentCallingLead by remember { mutableStateOf<LeadItem?>(null) }
+    var showCallingSheet by remember { mutableStateOf(false) }
+    var showSettingsModal by remember { mutableStateOf(false) }
+    var webKey by remember { mutableStateOf(0) }
+    var pageTitle by remember { mutableStateOf("LeadPedlar") }
 
-    if (!isLoggedIn) {
-        LoginScreen(
-            onLoginSuccess = {
-                currentTab = if (isAdmin) AppTab.ADMIN else AppTab.LEADS
-            }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    // Trigger call selector or direct call
+    fun triggerCall(phoneNumber: String, leadName: String) {
+        val lead = LeadItem(
+            id = "call-target",
+            name = leadName,
+            phone = phoneNumber,
+            city = "",
+            status = "NEW",
+            rowIndex = 1
         )
-    } else {
-        Scaffold(
-            modifier = modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding(),
-            containerColor = BgDark,
-            bottomBar = {
-                Surface(
-                    color = SurfaceDark,
+
+        // Check if there is an active default dialer and user didn't request "Always Ask"
+        if (!alwaysAsk && preferredApp != CallAppType.SYSTEM_CHOOSER) {
+            Toast.makeText(context, "Dialing via ${preferredApp.displayName}...", Toast.LENGTH_SHORT).show()
+            CallManager.launchCall(context, preferredApp, phoneNumber)
+            return
+        }
+
+        currentCallingLead = lead
+        showCallingSheet = true
+    }
+
+    Scaffold(
+        modifier = modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .navigationBarsPadding(),
+        containerColor = BgDark,
+        topBar = {
+            Surface(
+                color = SurfaceDark,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, SurfaceBorder)
+            ) {
+                Row(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-                        .border(1.dp, SurfaceBorder, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    NavigationBar(
-                        containerColor = Color.Transparent,
-                        contentColor = TextPrimary,
-                        tonalElevation = 0.dp
+                    // Logo & App Name
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { webKey++ }
                     ) {
-                        availableTabs.forEach { tab ->
-                            val isSelected = (currentTab == tab)
-                            NavigationBarItem(
-                                selected = isSelected,
-                                onClick = { currentTab = tab },
-                                icon = tab.icon,
-                                label = {
-                                    Text(
-                                        text = tab.title,
-                                        fontSize = 11.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                    )
-                                },
-                                colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = Emerald500,
-                                    selectedTextColor = Emerald500,
-                                    unselectedIconColor = TextMuted,
-                                    unselectedTextColor = TextMuted,
-                                    indicatorColor = Emerald500.copy(alpha = 0.15f)
-                                )
+                        Box(
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Emerald500.copy(alpha = 0.2f))
+                                .border(1.dp, Emerald500.copy(alpha = 0.4f), RoundedCornerShape(8.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("⚡", fontSize = 16.sp)
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = "LeadPedlar",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
                             )
+                            Text(
+                                text = if (serverUrl.contains("10.0.2.2")) "Emulator Server" else if (serverUrl.contains("leadpedlar.xyz")) "Live Production" else "Custom Server",
+                                fontSize = 10.sp,
+                                color = Emerald500
+                            )
+                        }
+                    }
+
+                    // Action buttons
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Quick Calling Preference Indicator badge
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Cyan500.copy(alpha = 0.15f))
+                                .border(1.dp, Cyan500.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                .clickable { showSettingsModal = true }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            val label = if (alwaysAsk || preferredApp == CallAppType.SYSTEM_CHOOSER) "⚙️ Ask App" else "📞 ${preferredApp.displayName.take(8)}"
+                            Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Cyan400)
+                        }
+
+                        Spacer(modifier = Modifier.width(4.dp))
+
+                        // Refresh button
+                        IconButton(
+                            onClick = { webKey++ },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = TextSecondary, modifier = Modifier.size(18.dp))
+                        }
+
+                        // Settings button
+                        IconButton(
+                            onClick = { showSettingsModal = true },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(Icons.Default.Settings, contentDescription = "Settings", tint = TextSecondary, modifier = Modifier.size(18.dp))
                         }
                     }
                 }
             }
-        ) { paddingValues ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
+        }
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            // Main Web Application Container with JavaScript Bridge
+            LeadPedlarWebView(
+                url = serverUrl,
+                onOpenCallSelector = { phone, name ->
+                    triggerCall(phone, name)
+                },
+                onTitleChange = { pageTitle = it }
+            )
+        }
+
+        // Native Calling App Selector Bottom Sheet Modal
+        if (showCallingSheet && currentCallingLead != null) {
+            val availableApps = remember(context, preferredApp) {
+                CallManager.getAvailableCallApps(context, preferredApp)
+            }
+
+            CallAppSelectorBottomSheet(
+                phoneNumber = currentCallingLead!!.phone,
+                leadName = currentCallingLead!!.name,
+                availableApps = availableApps,
+                sheetState = sheetState,
+                onDismiss = { showCallingSheet = false },
+                onAppSelected = { appType, alwaysUse ->
+                    showCallingSheet = false
+                    coroutineScope.launch {
+                        dialerPrefs.saveDefaultApp(appType, alwaysUseThisApp = alwaysUse)
+                        if (alwaysUse) {
+                            Toast.makeText(context, "Saved ${appType.displayName} as default dialer", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    CallManager.launchCall(context, appType, currentCallingLead!!.phone)
+                }
+            )
+        }
+
+        // Native Settings Modal
+        if (showSettingsModal) {
+            ModalBottomSheet(
+                onDismissRequest = { showSettingsModal = false },
+                sheetState = sheetState,
+                containerColor = BgDark,
+                contentColor = TextPrimary
             ) {
-                when (currentTab) {
-                    AppTab.ADMIN -> AdminOverviewScreen()
-                    AppTab.LEADS -> LeadsScreen(onNavigateToSettings = { currentTab = AppTab.SETTINGS })
-                    AppTab.MARKETPLACE -> MarketplaceScreen()
-                    AppTab.SETTINGS -> SettingsScreen(onLogout = { currentTab = AppTab.LEADS })
+                Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+                    SettingsScreen(
+                        onLogout = {
+                            showSettingsModal = false
+                            webKey++
+                        }
+                    )
                 }
             }
         }
