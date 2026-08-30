@@ -6,8 +6,8 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
 import android.view.ViewGroup
+import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
-import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -16,11 +16,26 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.WifiOff
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -31,11 +46,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.leadpedlar.calling.CallManager
 import com.example.leadpedlar.theme.BgDark
 import com.example.leadpedlar.theme.Emerald500
+import com.example.leadpedlar.theme.StatusDanger
+import com.example.leadpedlar.theme.SurfaceCard
+import com.example.leadpedlar.theme.TextMuted
+import com.example.leadpedlar.theme.TextPrimary
+import com.example.leadpedlar.theme.TextSecondary
 
 class LeadPedlarAndroidBridge(
     private val onOpenCallSelector: (phoneNumber: String, leadName: String) -> Unit,
@@ -74,6 +97,8 @@ fun LeadPedlarWebView(
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }
     var progress by remember { mutableFloatStateOf(0f) }
     var isLoading by remember { mutableStateOf(true) }
+    var isError by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf("") }
     var canGoBack by remember { mutableStateOf(false) }
 
     BackHandler(enabled = canGoBack) {
@@ -90,10 +115,13 @@ fun LeadPedlarWebView(
                     )
                     setBackgroundColor(0xFF0B0F17.toInt())
 
+                    // Enable Cookies
+                    CookieManager.getInstance().setAcceptCookie(true)
+                    CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+
                     settings.apply {
                         javaScriptEnabled = true
                         domStorageEnabled = true
-                        databaseEnabled = true
                         useWideViewPort = true
                         loadWithOverviewMode = true
                         setSupportZoom(false)
@@ -116,6 +144,7 @@ fun LeadPedlarWebView(
                         override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                             super.onPageStarted(view, url, favicon)
                             isLoading = true
+                            isError = false
                             canGoBack = view?.canGoBack() ?: false
                         }
 
@@ -163,8 +192,11 @@ fun LeadPedlarWebView(
                         }
 
                         override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
-                            super.onReceivedError(view, request, error)
-                            isLoading = false
+                            if (request?.isForMainFrame == true) {
+                                isError = true
+                                errorMessage = error?.description?.toString() ?: "Network error"
+                                isLoading = false
+                            }
                         }
                     }
 
@@ -188,7 +220,7 @@ fun LeadPedlarWebView(
                 }
             },
             update = { webView ->
-                if (webView.url != url && !url.isEmpty()) {
+                if (webView.url != url && url.isNotBlank()) {
                     webView.loadUrl(url)
                 }
             },
@@ -196,7 +228,7 @@ fun LeadPedlarWebView(
         )
 
         // Progress bar indicator
-        if (isLoading && progress < 1f) {
+        if (isLoading && progress < 1f && !isError) {
             LinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier
@@ -206,6 +238,60 @@ fun LeadPedlarWebView(
                 color = Emerald500,
                 trackColor = Color.Transparent
             )
+        }
+
+        // Connection Error / Offline Retry Card
+        if (isError) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(BgDark),
+                color = BgDark
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        Icons.Default.WifiOff,
+                        contentDescription = null,
+                        tint = StatusDanger,
+                        modifier = Modifier.size(56.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Unable to Connect to Server",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Please check your internet connection or verify the server address.\n\nEndpoint: $url",
+                        fontSize = 12.sp,
+                        color = TextMuted,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Button(
+                        onClick = {
+                            isError = false
+                            isLoading = true
+                            webViewInstance?.loadUrl(url)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Emerald500, contentColor = Color.Black),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Retry Connection", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
         }
     }
 

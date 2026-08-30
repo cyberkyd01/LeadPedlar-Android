@@ -20,11 +20,16 @@ class AppPreferences(private val context: Context) {
         val KEY_USER_ROLE = stringPreferencesKey("user_role")
         val KEY_USER_NAME = stringPreferencesKey("user_name")
         val KEY_IS_LOGGED_IN = booleanPreferencesKey("is_logged_in")
-        const val DEFAULT_SERVER_URL = "http://10.0.2.2:3000"
+        const val DEFAULT_SERVER_URL = "https://www.leadpedlar.xyz"
     }
 
     val serverUrlFlow: Flow<String> = context.appDataStore.data.map { prefs ->
-        prefs[KEY_SERVER_URL] ?: DEFAULT_SERVER_URL
+        val saved = prefs[KEY_SERVER_URL]
+        if (saved.isNullOrBlank() || saved.contains("10.0.2.2")) {
+            DEFAULT_SERVER_URL
+        } else {
+            saved
+        }
     }
 
     val isLoggedInFlow: Flow<Boolean> = context.appDataStore.data.map { prefs ->
