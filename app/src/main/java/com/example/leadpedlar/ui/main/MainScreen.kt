@@ -13,11 +13,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Handshake
 import androidx.compose.material.icons.filled.ListAlt
 import androidx.compose.material.icons.filled.PhoneInTalk
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -48,7 +47,6 @@ import com.example.leadpedlar.calling.CallManager
 import com.example.leadpedlar.data.model.CallAppType
 import com.example.leadpedlar.data.model.LeadItem
 import com.example.leadpedlar.theme.BgDark
-import com.example.leadpedlar.theme.Cyan400
 import com.example.leadpedlar.theme.Emerald500
 import com.example.leadpedlar.theme.SurfaceBorder
 import com.example.leadpedlar.theme.SurfaceDark
@@ -62,18 +60,18 @@ import kotlinx.coroutines.launch
 enum class WebNavTab(val title: String, val path: String, val icon: @Composable () -> Unit) {
     MARKETPLACE(
         title = "Marketplace",
-        path = "/",
+        path = "/agent/marketplace",
         icon = { Icon(Icons.Default.Storefront, contentDescription = "Marketplace", modifier = Modifier.size(20.dp)) }
+    ),
+    SEARCH(
+        title = "Deep Search",
+        path = "/admin/search",
+        icon = { Icon(Icons.Default.Search, contentDescription = "Deep Search", modifier = Modifier.size(20.dp)) }
     ),
     LEADS(
         title = "My Leads",
         path = "/agent/leads",
         icon = { Icon(Icons.Default.ListAlt, contentDescription = "My Leads", modifier = Modifier.size(20.dp)) }
-    ),
-    DASHBOARD(
-        title = "Dashboard",
-        path = "/agent/dashboard",
-        icon = { Icon(Icons.Default.Dashboard, contentDescription = "Dashboard", modifier = Modifier.size(20.dp)) }
     ),
     ESCROW(
         title = "Escrow",
@@ -81,9 +79,9 @@ enum class WebNavTab(val title: String, val path: String, val icon: @Composable 
         icon = { Icon(Icons.Default.Handshake, contentDescription = "Escrow", modifier = Modifier.size(20.dp)) }
     ),
     SETTINGS(
-        title = "Dialer / Settings",
+        title = "Dialer",
         path = "",
-        icon = { Icon(Icons.Default.PhoneInTalk, contentDescription = "Settings", modifier = Modifier.size(20.dp)) }
+        icon = { Icon(Icons.Default.PhoneInTalk, contentDescription = "Dialer Settings", modifier = Modifier.size(20.dp)) }
     )
 }
 
@@ -106,7 +104,7 @@ fun MainScreen(
     var showSettingsModal by remember { mutableStateOf(false) }
 
     var currentTab by remember { mutableStateOf(WebNavTab.MARKETPLACE) }
-    var activeWebUrl by remember(serverUrl) { mutableStateOf(serverUrl) }
+    var activeWebUrl by remember(serverUrl) { mutableStateOf("$serverUrl/agent/marketplace") }
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
