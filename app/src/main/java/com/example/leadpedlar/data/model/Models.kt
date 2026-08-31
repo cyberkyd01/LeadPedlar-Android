@@ -99,6 +99,20 @@ enum class CallAppType(
         description = "Viber voice & message",
         iconEmoji = "💜"
     ),
+    ZOIPER(
+        id = "zoiper",
+        displayName = "Zoiper Softphone",
+        packageName = "com.zoiper.android.app",
+        description = "Zoiper SIP softphone app",
+        iconEmoji = "🎧"
+    ),
+    SIP_CLIENT(
+        id = "sip_client",
+        displayName = "SIP Client (Eyebeam / Bria)",
+        packageName = null,
+        description = "Direct SIP URI invite (sip:)",
+        iconEmoji = "💻"
+    ),
     SYSTEM_CHOOSER(
         id = "system_chooser",
         displayName = "Always Ask (System Chooser)",
@@ -109,7 +123,19 @@ enum class CallAppType(
 
     companion object {
         fun fromId(id: String?): CallAppType {
-            return entries.firstOrNull { it.id == id } ?: SYSTEM_CHOOSER
+            return when (id?.lowercase()?.trim()) {
+                "default_tel", "system_dialer", "tel" -> SYSTEM_DIALER
+                "whatsapp" -> WHATSAPP
+                "whatsapp_business", "whatsapp_biz" -> WHATSAPP_BUSINESS
+                "telegram", "tg" -> TELEGRAM
+                "skype" -> SKYPE
+                "truecaller" -> TRUECALLER
+                "viber" -> VIBER
+                "zoiper" -> ZOIPER
+                "sip_client", "sip" -> SIP_CLIENT
+                "android_chooser", "system_chooser", "chooser" -> SYSTEM_CHOOSER
+                else -> entries.firstOrNull { it.id.equals(id, ignoreCase = true) } ?: SYSTEM_CHOOSER
+            }
         }
     }
 }

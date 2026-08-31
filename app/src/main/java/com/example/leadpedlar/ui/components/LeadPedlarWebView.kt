@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.leadpedlar.calling.CallManager
+import com.example.leadpedlar.data.model.CallAppType
 import com.example.leadpedlar.theme.BgDark
 import com.example.leadpedlar.theme.Emerald500
 import com.example.leadpedlar.theme.StatusDanger
@@ -62,6 +63,8 @@ import com.example.leadpedlar.theme.TextSecondary
 
 class LeadPedlarAndroidBridge(
     private val onOpenCallSelector: (phoneNumber: String, leadName: String) -> Unit,
+    private val onLaunchSpecificApp: (appId: String, phoneNumber: String) -> Unit,
+    private val onResetDefaults: () -> Unit,
     private val context: Context
 ) {
     @JavascriptInterface
@@ -72,6 +75,16 @@ class LeadPedlarAndroidBridge(
     @JavascriptInterface
     fun makeCall(phoneNumber: String) {
         onOpenCallSelector(phoneNumber, "Lead Contact")
+    }
+
+    @JavascriptInterface
+    fun launchSpecificApp(appId: String, phoneNumber: String) {
+        onLaunchSpecificApp(appId, phoneNumber)
+    }
+
+    @JavascriptInterface
+    fun resetDialerDefaults() {
+        onResetDefaults()
     }
 
     @JavascriptInterface
@@ -91,6 +104,8 @@ class LeadPedlarAndroidBridge(
 fun LeadPedlarWebView(
     url: String,
     onOpenCallSelector: (phoneNumber: String, leadName: String) -> Unit,
+    onLaunchSpecificApp: ((appId: String, phoneNumber: String) -> Unit)? = null,
+    onResetDefaults: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     onTitleChange: ((String) -> Unit)? = null
 ) {
@@ -136,7 +151,21 @@ fun LeadPedlarWebView(
 
                     // Attach Javascript Interface
                     addJavascriptInterface(
-                        LeadPedlarAndroidBridge(onOpenCallSelector, context),
+                        LeadPedlarAndroidBridge(
+                            onOpenCallSelector = onOpenCallSelector,
+                            onLaunchSpecificApp = { appId, phone ->
+                                if (onLaunchSpecificApp != null) {
+                                    onLaunchSpecificApp(appId, phone)
+                                } else {
+                                    val appType = CallAppType.fromId(appId)
+                                    CallManager.launchCall(context, appType, phone)
+                                }
+                            },
+                            onResetDefaults = {
+                                onResetDefaults?.invoke()
+                            },
+                            context = context
+                        ),
                         "AndroidBridge"
                     )
 

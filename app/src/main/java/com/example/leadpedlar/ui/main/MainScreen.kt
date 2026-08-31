@@ -187,7 +187,26 @@ fun MainScreen(
             LeadPedlarWebView(
                 url = activeWebUrl,
                 onOpenCallSelector = { phone, name ->
-                    triggerCall(phone, name)
+                    val lead = LeadItem(
+                        id = "call-target",
+                        name = name,
+                        phone = phone,
+                        city = "",
+                        status = "NEW",
+                        rowIndex = 1
+                    )
+                    currentCallingLead = lead
+                    showCallingSheet = true
+                },
+                onLaunchSpecificApp = { appId, phone ->
+                    val appType = CallAppType.fromId(appId)
+                    CallManager.launchCall(context, appType, phone)
+                },
+                onResetDefaults = {
+                    coroutineScope.launch {
+                        dialerPrefs.resetToAlwaysAsk()
+                        Toast.makeText(context, "Dialer defaults reset to Always Ask", Toast.LENGTH_SHORT).show()
+                    }
                 }
             )
         }

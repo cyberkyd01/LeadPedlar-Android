@@ -138,6 +138,36 @@ object CallManager {
                     }
                 }
 
+                CallAppType.ZOIPER -> {
+                    val zoiperUri = Uri.parse("zoiper:$cleanPhone")
+                    val intent = Intent(Intent.ACTION_VIEW, zoiperUri).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    try {
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                        val fallback = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$cleanPhone")).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                        context.startActivity(fallback)
+                    }
+                }
+
+                CallAppType.SIP_CLIENT -> {
+                    val sipUri = Uri.parse("sip:$cleanPhone")
+                    val intent = Intent(Intent.ACTION_VIEW, sipUri).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    try {
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                        val fallback = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$cleanPhone")).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                        context.startActivity(fallback)
+                    }
+                }
+
                 CallAppType.SYSTEM_CHOOSER -> {
                     val dialIntent = Intent(Intent.ACTION_DIAL).apply {
                         data = Uri.parse("tel:$cleanPhone")
