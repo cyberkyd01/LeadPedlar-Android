@@ -13,10 +13,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Handshake
 import androidx.compose.material.icons.filled.ListAlt
 import androidx.compose.material.icons.filled.PhoneInTalk
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -58,15 +58,15 @@ import com.example.leadpedlar.ui.screens.settings.SettingsScreen
 import kotlinx.coroutines.launch
 
 enum class WebNavTab(val title: String, val path: String, val icon: @Composable () -> Unit) {
+    HOME(
+        title = "Home",
+        path = "/",
+        icon = { Icon(Icons.Default.Home, contentDescription = "Home", modifier = Modifier.size(20.dp)) }
+    ),
     MARKETPLACE(
         title = "Marketplace",
-        path = "/agent/marketplace",
+        path = "/marketplace",
         icon = { Icon(Icons.Default.Storefront, contentDescription = "Marketplace", modifier = Modifier.size(20.dp)) }
-    ),
-    SEARCH(
-        title = "Deep Search",
-        path = "/admin/search",
-        icon = { Icon(Icons.Default.Search, contentDescription = "Deep Search", modifier = Modifier.size(20.dp)) }
     ),
     LEADS(
         title = "My Leads",
@@ -103,32 +103,10 @@ fun MainScreen(
     var showCallingSheet by remember { mutableStateOf(false) }
     var showSettingsModal by remember { mutableStateOf(false) }
 
-    var currentTab by remember { mutableStateOf(WebNavTab.MARKETPLACE) }
-    var activeWebUrl by remember(serverUrl) { mutableStateOf("$serverUrl/agent/marketplace") }
+    var currentTab by remember { mutableStateOf(WebNavTab.HOME) }
+    var activeWebUrl by remember(serverUrl) { mutableStateOf(serverUrl) }
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    // Trigger call selector or direct call
-    fun triggerCall(phoneNumber: String, leadName: String) {
-        val lead = LeadItem(
-            id = "call-target",
-            name = leadName,
-            phone = phoneNumber,
-            city = "",
-            status = "NEW",
-            rowIndex = 1
-        )
-
-        // Check if there is an active default dialer and user didn't request "Always Ask"
-        if (!alwaysAsk && preferredApp != CallAppType.SYSTEM_CHOOSER) {
-            Toast.makeText(context, "Dialing via ${preferredApp.displayName}...", Toast.LENGTH_SHORT).show()
-            CallManager.launchCall(context, preferredApp, phoneNumber)
-            return
-        }
-
-        currentCallingLead = lead
-        showCallingSheet = true
-    }
 
     Scaffold(
         modifier = modifier
@@ -155,7 +133,7 @@ fun MainScreen(
                             onClick = {
                                 currentTab = tab
                                 val base = serverUrl.trimEnd('/')
-                                activeWebUrl = "$base${tab.path}"
+                                activeWebUrl = if (tab.path == "/") base else "$base${tab.path}"
                             },
                             icon = tab.icon,
                             label = {
@@ -195,8 +173,14 @@ fun MainScreen(
                         status = "NEW",
                         rowIndex = 1
                     )
-                    currentCallingLead = lead
-                    showCallingSheet = true
+                    // Check if there is an active default dialer and user didn't request "Always Ask"
+                    if (!alwaysAsk && preferredApp != CallAppType.SYSTEM_CHOOSER) {
+                        Toast.makeText(context, "Dialing via ${preferredApp.displayName}...", Toast.LENGTH_SHORT).show()
+                        CallManager.launchCall(context, preferredApp, phone)
+                    } else {
+                        currentCallingLead = lead
+                        showCallingSheet = true
+                    }
                 },
                 onLaunchSpecificApp = { appId, phone ->
                     val appType = CallAppType.fromId(appId)
