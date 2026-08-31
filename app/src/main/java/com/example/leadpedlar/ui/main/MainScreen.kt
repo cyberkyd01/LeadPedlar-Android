@@ -78,10 +78,10 @@ enum class WebNavTab(val title: String, val path: String, val icon: @Composable 
         path = "/agent/escrow",
         icon = { Icon(Icons.Default.Handshake, contentDescription = "Escrow", modifier = Modifier.size(20.dp)) }
     ),
-    SETTINGS(
-        title = "Dialer",
-        path = "",
-        icon = { Icon(Icons.Default.PhoneInTalk, contentDescription = "Dialer Settings", modifier = Modifier.size(20.dp)) }
+    SIP_PHONE(
+        title = "SIP Dialer",
+        path = "/agent/sip",
+        icon = { Icon(Icons.Default.PhoneInTalk, contentDescription = "SIP Dialer", modifier = Modifier.size(20.dp)) }
     )
 }
 
@@ -153,13 +153,9 @@ fun MainScreen(
                         NavigationBarItem(
                             selected = isSelected,
                             onClick = {
-                                if (tab == WebNavTab.SETTINGS) {
-                                    showSettingsModal = true
-                                } else {
-                                    currentTab = tab
-                                    val base = serverUrl.trimEnd('/')
-                                    activeWebUrl = "$base${tab.path}"
-                                }
+                                currentTab = tab
+                                val base = serverUrl.trimEnd('/')
+                                activeWebUrl = "$base${tab.path}"
                             },
                             icon = tab.icon,
                             label = {
